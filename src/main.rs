@@ -6,6 +6,10 @@ use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 
+// Chain of repsonsibility pattern
+// https://en.wikipedia.org/wiki/Chain-of-responsibility_pattern
+// https://rust-unofficial.github.io/patterns/patterns/behavioural/chain_of_responsibility.html
+
 enum Mode {
     Encrypt,
     Decrypt,
@@ -18,7 +22,6 @@ fn main() {
         .prompt()
         .expect("No option selected.");
 
-    // Get Mode from mode
     let mode = match ans {
         "Encrypt" => Mode::Encrypt,
         "Decrypt" => Mode::Decrypt,
@@ -115,6 +118,33 @@ fn main() {
         // -r: read from file
         // The last argument is the input file
 
+        // Now let's create a PDF file with the QR code
+        let pdf_filename = hex_filename.replace(".hex", ".pdf");
+        // The PDF should fit in a A4 page, we print the QR code
+        // and then below can be whitespace
+        Command::new("convert")
+            .arg(&png_filename)
+            .arg(&pdf_filename)
+            .output()
+            .expect("convert failed to start");
+        // Explanation of everything:
+        // -size: size of the image
+        // -units: units of the size
+        // -density: DPI
+        // -background: background color
+        // -alpha: background color
+        // -gravity: where to put the image
+        // -extent: size of the image
+        // -append: append the image to the previous one
+        // The last argument is the input file
+        
+
+        // Command::new("convert")
+        //     .arg(&png_filename)
+        //     .arg(&pdf_filename)
+        //     .output()
+        //     .expect("convert failed to start");
+
         // Instead, we will write the bytes but as text, in hexadecimal
         // let mut result_file = File::create(&hexa_filename).expect("Creating the result file...");
         // for byte in &concatenated_bytes {
@@ -204,17 +234,6 @@ fn main() {
                 result_file
                     .write_all(&decrypted_bytes)
                     .expect("Writing to the result file...");
-
-                // After the process, create a PDF file with the decrypted file QR code
-                // This is the command we will run: qrencode -o qr.png -t PNG < decrypted_filename
-                // let mut child = Command::new("qrencode")
-                //     .arg("-o")
-                //     .arg("qr.png")
-                //     .arg("-t")
-                //     .arg("PNG")
-                //     .stdin(Stdio::piped())
-                //     .spawn()
-                //     .expect("Creating the QR code...");
             }
         }
         // In the end, delete each file
