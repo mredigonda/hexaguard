@@ -1,10 +1,15 @@
 use inquire::Select;
 use inquire::Text;
+use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-use std::fs::File;
+
+enum Mode {
+    Encrypt,
+    Decrypt,
+}
 
 fn main() {
     let options = vec!["Encrypt", "Decrypt"];
@@ -12,34 +17,20 @@ fn main() {
     let ans = Select::new("What?", options)
         .prompt()
         .expect("No option selected.");
-    let filename = Text::new("What filename?").prompt().expect("No filename.");
 
-    // Check that if decrypting, the file ends in .hexa
-    if ans == "Decrypt" {
-        if filename.ends_with(".png") {
-            // TODO: continue with this branch of code...
+    // Get Mode from mode
+    let mode = match ans {
+        "Encrypt" => Mode::Encrypt,
+        "Decrypt" => Mode::Decrypt,
+        _ => panic!("Invalid mode"),
+    };
 
-            // Transform the .png file into a .hexa file
-            // First, zbarimg the file, raw
-            let filename_hexa = filename.replace(".png", ".hexa");
-            Command::new("zbarimg")
-                .arg("--raw")
-                .arg(&filename)
-                // Then pipe
-                .stdout(std::process::Stdio::piped())
-                // And then save the output to a file
-                .arg(&filename_hexa)
-                .output()
-                .expect("zbarimg failed to start");
-            println!("Converted the .png file into a .hexa file.");
-            return;
-        }
-        if !filename.ends_with(".hexa") {
-            println!("Filename must end in .hexa");
-            return;
-        }
-        
-    }
+    let base_filename = Text::new("What filename?").prompt().expect("No filename.");
+    let filename = get_processed_filename(&base_filename, &mode);
+
+    println!("Filename: {}", filename);
+
+    assert!(!matches!(&mode, Mode::Decrypt) || filename.ends_with(".hexa"));
 
     if !Path::new(&filename).exists() {
         println!("No file.");
@@ -57,10 +48,13 @@ fn main() {
     }
 
     // Vector of separator bytes, completely random, based on: "6b 05 8e d2 3f 67 c7 b3 a3 71 a4 12 e1 a6 fa 35"
-    let mut separator_bytes = vec![0x6b, 0x05, 0x8e, 0xd2, 0x3f, 0x67, 0xc7, 0xb3, 0xa3, 0x71, 0xa4, 0x12, 0xe1, 0xa6, 0xfa, 0x35];
+    let mut separator_bytes = vec![
+        0x6b, 0x05, 0x8e, 0xd2, 0x3f, 0x67, 0xc7, 0xb3, 0xa3, 0x71, 0xa4, 0x12, 0xe1, 0xa6, 0xfa,
+        0x35,
+    ];
     let separator_bytes_size = separator_bytes.len();
 
-    if ans == "Encrypt" {
+    if matches!(mode, Mode::Encrypt) {
         encrypt(&filename, &passphrase);
 
         let hexa_filename = Text::new("Where?").prompt().expect("No result filename.");
@@ -84,7 +78,7 @@ fn main() {
             .expect("Writing to the result file...");
 
         let hex_filename = hexa_filename.replace(".hexa", ".hex");
-        
+
         // Then, convert the file to hexadecimal with command xxd
         Command::new("xxd")
             .arg("-p")
@@ -93,7 +87,7 @@ fn main() {
             .arg(&hex_filename)
             .output()
             .expect("xxd failed to start");
-        
+
         // Now let's use this .hex file to get the QR code
         // First, we need to convert the .hex file into a .png file
         let png_filename = hex_filename.replace(".hex", ".png");
@@ -142,20 +136,27 @@ fn main() {
         //     }
         // }
         // result_file.write_all(&result_file_bytes).expect("Writing to the result file...");
-        
 
         // After the process, delete the encrypted file
         std::fs::remove_file(encrypted_filename).expect("Deleting the encrypted file...");
         // And also the .hex file
         std::fs::remove_file(hex_filename).expect("Deleting the .hex file...");
     } else {
+        // Decrypt
+        println!("File to decrypt: {}", filename);
+
         let hexa_bytes = get_file_bytes(&filename);
 
         // Save all indexes where we have separator bytes
+        // Print hexa bytes, in hex:
+        for byte in &hexa_bytes {
+            print!("{:02x}", byte);
+        }
+
         let mut indexes: Vec<usize> = Vec::new();
         for i in 0..hexa_bytes.len() {
             // Check if the sequence of separator bytes appears
-            if i + separator_bytes_size < hexa_bytes.len() {
+            if i + separator_bytes_size - 1 < hexa_bytes.len() {
                 let mut is_separator = true;
                 for j in 0..separator_bytes_size {
                     if hexa_bytes[i + j] != separator_bytes[j] {
@@ -168,13 +169,16 @@ fn main() {
                 }
             }
         }
+        // Print indexes
+        println!("Indexes: {:?}", indexes);
         // Then get all the bytes between the indexes
         let mut split_bytes: Vec<Vec<u8>> = Vec::new();
         for i in 0..indexes.len() {
             if i == 0 {
                 split_bytes.push(hexa_bytes[0..indexes[i]].to_vec());
             } else {
-                split_bytes.push(hexa_bytes[indexes[i - 1] + separator_bytes_size..indexes[i]].to_vec());
+                split_bytes
+                    .push(hexa_bytes[indexes[i - 1] + separator_bytes_size..indexes[i]].to_vec());
             }
         }
 
@@ -186,7 +190,8 @@ fn main() {
         // Write each to its own file
         for i in 0..split_bytes.len() {
             let mut file = File::create(format!("{}.gpg", i)).expect("Creating the file...");
-            file.write_all(&split_bytes[i]).expect("Writing to the file...");
+            file.write_all(&split_bytes[i])
+                .expect("Writing to the file...");
         }
         // Decrypt each file
         for i in 0..split_bytes.len() {
@@ -194,8 +199,11 @@ fn main() {
                 // If decryption worked, write the decrypted file to the result file
                 let decrypted_bytes = get_file_bytes(&format!("{}", i));
                 let decrypted_filename = filename.replace(".hexa", "");
-                let mut result_file = File::create(&decrypted_filename).expect("Creating the result file...");
-                result_file.write_all(&decrypted_bytes).expect("Writing to the result file...");
+                let mut result_file =
+                    File::create(&decrypted_filename).expect("Creating the result file...");
+                result_file
+                    .write_all(&decrypted_bytes)
+                    .expect("Writing to the result file...");
 
                 // After the process, create a PDF file with the decrypted file QR code
                 // This is the command we will run: qrencode -o qr.png -t PNG < decrypted_filename
@@ -262,4 +270,54 @@ fn get_file_bytes(filename: &String) -> Vec<u8> {
         println!("Bytes read from result filename: {}", bytes_read);
     }
     buf
+}
+
+fn get_processed_filename(filename: &String, mode: &Mode) -> String {
+    let mut processed_filename = filename.clone();
+    if matches!(mode, Mode::Decrypt) {
+        if processed_filename.contains(".png") {
+            // Then it's a QR code. We need to convert it to a .hexa file
+            // First, to hexadecimal
+            let hex_filename = processed_filename.replace(".png", ".hex");
+            
+            // This is the command we will run: zbarimg --raw -q <filename> > <filename>
+            let output = Command::new("zbarimg")
+            .arg("--raw")
+            .arg("-q")
+            .arg(&filename)
+            // We pipe the output to a file, to write the file
+            // Like if we were doing "> <filename>"
+            .stdout(std::process::Stdio::piped())
+            .arg(&hex_filename)
+            .output().expect("zbarimg failed to start");
+
+            // Write the stdout of the above to a file:
+            let mut file = File::create(&hex_filename).expect("Creating the file...");
+            file.write_all(&output.stdout).expect("Writing to the file...");
+
+            // println!(
+            //     "Output: {}",
+            //     String::from_utf8(output.stdout).expect("Error converting output to string")
+            // );
+            
+            processed_filename = processed_filename.replace(".png", ".hexa");
+            // Then convert from hexadecimal to binary
+            // This is the command we will run: xxd -r -p <filename> <filename>
+            Command::new("xxd")
+                .arg("-r")
+                .arg("-p")
+                .arg(&hex_filename)
+                .stdout(std::process::Stdio::piped())
+                .arg(&processed_filename)
+                .output()
+                .expect("xxd failed to start");
+            println!(
+                "QR code converted to .hexa file called {}",
+                processed_filename
+            );
+        } else if !processed_filename.contains(".hexa") {
+            panic!("The file must be a .png or a .hexa file")
+        }
+    }
+    processed_filename
 }
