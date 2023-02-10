@@ -15,9 +15,30 @@ fn main() {
     let filename = Text::new("What filename?").prompt().expect("No filename.");
 
     // Check that if decrypting, the file ends in .hexa
-    if ans == "Decrypt" && !filename.ends_with(".hexa") {
-        println!("Filename must end in .hexa");
-        return;
+    if ans == "Decrypt" {
+        if filename.ends_with(".png") {
+            // TODO: continue with this branch of code...
+
+            // Transform the .png file into a .hexa file
+            // First, zbarimg the file, raw
+            let filename_hexa = filename.replace(".png", ".hexa");
+            Command::new("zbarimg")
+                .arg("--raw")
+                .arg(&filename)
+                // Then pipe
+                .stdout(std::process::Stdio::piped())
+                // And then save the output to a file
+                .arg(&filename_hexa)
+                .output()
+                .expect("zbarimg failed to start");
+            println!("Converted the .png file into a .hexa file.");
+            return;
+        }
+        if !filename.ends_with(".hexa") {
+            println!("Filename must end in .hexa");
+            return;
+        }
+        
     }
 
     if !Path::new(&filename).exists() {
@@ -42,14 +63,14 @@ fn main() {
     if ans == "Encrypt" {
         encrypt(&filename, &passphrase);
 
-        let result_filename = Text::new("Where?").prompt().expect("No result filename.");
-        // Check if result_filename ends in ".hexa"
-        if !result_filename.ends_with(".hexa") {
+        let hexa_filename = Text::new("Where?").prompt().expect("No result filename.");
+        // Check if hexa_filename ends in ".hexa"
+        if !hexa_filename.ends_with(".hexa") {
             println!("Result filename must end in .hexa");
             return;
         }
 
-        let mut existing_bytes = get_file_bytes(&result_filename);
+        let mut existing_bytes = get_file_bytes(&hexa_filename);
         let encrypted_filename = filename + ".gpg";
         let mut new_bytes = get_file_bytes(&encrypted_filename);
         let mut concatenated_bytes = Vec::new();
@@ -57,17 +78,56 @@ fn main() {
         concatenated_bytes.append(&mut new_bytes);
         concatenated_bytes.append(&mut separator_bytes);
         // Write to file, overwriting the existing file
-        File::create(result_filename)
+        File::create(&hexa_filename)
             .expect("Creating the result file...")
             .write_all(&concatenated_bytes)
             .expect("Writing to the result file...");
+
+        let hex_filename = hexa_filename.replace(".hexa", ".hex");
+        
+        // Then, convert the file to hexadecimal with command xxd
+        Command::new("xxd")
+            .arg("-p")
+            .arg(&hexa_filename)
+            // And then save the output to a file
+            .arg(&hex_filename)
+            .output()
+            .expect("xxd failed to start");
+        
+        // Now let's use this .hex file to get the QR code
+        // First, we need to convert the .hex file into a .png file
+        let png_filename = hex_filename.replace(".hex", ".png");
+        Command::new("qrencode")
+            .arg("-o")
+            .arg(&png_filename)
+            .arg("-s")
+            .arg("10")
+            .arg("-l")
+            .arg("H")
+            .arg("-m")
+            .arg("1")
+            .arg("-d")
+            .arg("300")
+            .arg("-r")
+            .arg(&hex_filename)
+            .output()
+            .expect("qrencode failed to start");
+        // Explanation of everything:
+        // -o: output file
+        // -s: size of the QR code
+        // -l: error correction level, and the option selected is H for high
+        // -m: margin
+        // -d: DPI
+        // -r: read from file
+        // The last argument is the input file
+
         // Instead, we will write the bytes but as text, in hexadecimal
-        // let mut result_file = File::create(&result_filename).expect("Creating the result file...");
+        // let mut result_file = File::create(&hexa_filename).expect("Creating the result file...");
         // for byte in &concatenated_bytes {
         //     result_file.write_all(format!("{:02x}", byte).as_bytes()).expect("Writing to the result file...");
         // }
         // And then we read it and parse it back to binary
-        // let mut result_file = File::open(&result_filename).expect("Opening the result file...");
+        // let mut result_file = File::open(&hexa_filename).expect("Opening the result file...");
         // let mut result_file_bytes = Vec::new();
         // result_file.read_to_end(&mut result_file_bytes).expect("Reading the result file...");
         // let mut result_file_hexa = String::new();
@@ -86,6 +146,8 @@ fn main() {
 
         // After the process, delete the encrypted file
         std::fs::remove_file(encrypted_filename).expect("Deleting the encrypted file...");
+        // And also the .hex file
+        std::fs::remove_file(hex_filename).expect("Deleting the .hex file...");
     } else {
         let hexa_bytes = get_file_bytes(&filename);
 
