@@ -35,6 +35,10 @@ fn main() {
         return;
     }
 
+    // Vector of separator bytes, completely random, based on: "6b 05 8e d2 3f 67 c7 b3 a3 71 a4 12 e1 a6 fa 35"
+    let mut separator_bytes = vec![0x6b, 0x05, 0x8e, 0xd2, 0x3f, 0x67, 0xc7, 0xb3, 0xa3, 0x71, 0xa4, 0x12, 0xe1, 0xa6, 0xfa, 0x35];
+    let separator_bytes_size = separator_bytes.len();
+
     if ans == "Encrypt" {
         encrypt(&filename, &passphrase);
 
@@ -51,29 +55,53 @@ fn main() {
         let mut concatenated_bytes = Vec::new();
         concatenated_bytes.append(&mut existing_bytes);
         concatenated_bytes.append(&mut new_bytes);
-        concatenated_bytes.append(&mut vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        concatenated_bytes.append(&mut separator_bytes);
         // Write to file, overwriting the existing file
         File::create(result_filename)
             .expect("Creating the result file...")
             .write_all(&concatenated_bytes)
             .expect("Writing to the result file...");
+        // Instead, we will write the bytes but as text, in hexadecimal
+        // let mut result_file = File::create(&result_filename).expect("Creating the result file...");
+        // for byte in &concatenated_bytes {
+        //     result_file.write_all(format!("{:02x}", byte).as_bytes()).expect("Writing to the result file...");
+        // }
+        // And then we read it and parse it back to binary
+        // let mut result_file = File::open(&result_filename).expect("Opening the result file...");
+        // let mut result_file_bytes = Vec::new();
+        // result_file.read_to_end(&mut result_file_bytes).expect("Reading the result file...");
+        // let mut result_file_hexa = String::new();
+        // for byte in &result_file_bytes {
+        //     result_file_hexa.push_str(&format!("{:02x}", byte));
+        // }
+        // let mut result_file_bytes = Vec::new();
+        // for i in 0..result_file_hexa.len() {
+        //     if i % 2 == 0 {
+        //         let byte = u8::from_str_radix(&result_file_hexa[i..i + 2], 16).expect("Parsing the byte...");
+        //         result_file_bytes.push(byte);
+        //     }
+        // }
+        // result_file.write_all(&result_file_bytes).expect("Writing to the result file...");
+        
 
         // After the process, delete the encrypted file
         std::fs::remove_file(encrypted_filename).expect("Deleting the encrypted file...");
     } else {
         let hexa_bytes = get_file_bytes(&filename);
 
-        // Save all indexes where we have vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        // Save all indexes where we have separator bytes
         let mut indexes: Vec<usize> = Vec::new();
         for i in 0..hexa_bytes.len() {
-            if i + 5 < hexa_bytes.len() {
-                if hexa_bytes[i] == 0x00
-                    && hexa_bytes[i + 1] == 0x00
-                    && hexa_bytes[i + 2] == 0x00
-                    && hexa_bytes[i + 3] == 0x00
-                    && hexa_bytes[i + 4] == 0x00
-                    && hexa_bytes[i + 5] == 0x00
-                {
+            // Check if the sequence of separator bytes appears
+            if i + separator_bytes_size < hexa_bytes.len() {
+                let mut is_separator = true;
+                for j in 0..separator_bytes_size {
+                    if hexa_bytes[i + j] != separator_bytes[j] {
+                        is_separator = false;
+                        break;
+                    }
+                }
+                if is_separator {
                     indexes.push(i);
                 }
             }
@@ -84,7 +112,7 @@ fn main() {
             if i == 0 {
                 split_bytes.push(hexa_bytes[0..indexes[i]].to_vec());
             } else {
-                split_bytes.push(hexa_bytes[indexes[i - 1] + 6..indexes[i]].to_vec());
+                split_bytes.push(hexa_bytes[indexes[i - 1] + separator_bytes_size..indexes[i]].to_vec());
             }
         }
 
@@ -106,6 +134,17 @@ fn main() {
                 let decrypted_filename = filename.replace(".hexa", "");
                 let mut result_file = File::create(&decrypted_filename).expect("Creating the result file...");
                 result_file.write_all(&decrypted_bytes).expect("Writing to the result file...");
+
+                // After the process, create a PDF file with the decrypted file QR code
+                // This is the command we will run: qrencode -o qr.png -t PNG < decrypted_filename
+                // let mut child = Command::new("qrencode")
+                //     .arg("-o")
+                //     .arg("qr.png")
+                //     .arg("-t")
+                //     .arg("PNG")
+                //     .stdin(Stdio::piped())
+                //     .spawn()
+                //     .expect("Creating the QR code...");
             }
         }
         // In the end, delete each file
