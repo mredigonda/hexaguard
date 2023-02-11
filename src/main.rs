@@ -5,10 +5,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
-
-// Chain of repsonsibility pattern
-// https://en.wikipedia.org/wiki/Chain-of-responsibility_pattern
-// https://rust-unofficial.github.io/patterns/patterns/behavioural/chain_of_responsibility.html
+mod file;
 
 enum Mode {
     Encrypt,
@@ -29,6 +26,14 @@ fn main() {
     };
 
     let base_filename = Text::new("What filename?").prompt().expect("No filename.");
+
+    let file = file::File::new(&base_filename);
+    if file.filename.ends_with(".png") {
+        file.qr_png_to_hex();
+        println!("Converted to hex");
+        return;
+    }
+
     let filename = get_processed_filename(&base_filename, &mode);
 
     println!("Filename: {}", filename);
@@ -112,11 +117,10 @@ fn main() {
         // Explanation of everything:
         // -o: output file
         // -s: size of the QR code
-        // -l: error correction level, and the option selected is H for high
+        // -l: error correction level, H is the highest
         // -m: margin
         // -d: DPI
         // -r: read from file
-        // The last argument is the input file
 
         // Now let's create a PDF file with the QR code
         let pdf_filename = hex_filename.replace(".hex", ".pdf");
@@ -137,7 +141,6 @@ fn main() {
         // -extent: size of the image
         // -append: append the image to the previous one
         // The last argument is the input file
-        
 
         // Command::new("convert")
         //     .arg(&png_filename)
@@ -298,27 +301,29 @@ fn get_processed_filename(filename: &String, mode: &Mode) -> String {
             // Then it's a QR code. We need to convert it to a .hexa file
             // First, to hexadecimal
             let hex_filename = processed_filename.replace(".png", ".hex");
-            
+
             // This is the command we will run: zbarimg --raw -q <filename> > <filename>
             let output = Command::new("zbarimg")
-            .arg("--raw")
-            .arg("-q")
-            .arg(&filename)
-            // We pipe the output to a file, to write the file
-            // Like if we were doing "> <filename>"
-            .stdout(std::process::Stdio::piped())
-            .arg(&hex_filename)
-            .output().expect("zbarimg failed to start");
+                .arg("--raw")
+                .arg("-q")
+                .arg(&filename)
+                // We pipe the output to a file, to write the file
+                // Like if we were doing "> <filename>"
+                .stdout(std::process::Stdio::piped())
+                .arg(&hex_filename)
+                .output()
+                .expect("zbarimg failed to start");
 
             // Write the stdout of the above to a file:
             let mut file = File::create(&hex_filename).expect("Creating the file...");
-            file.write_all(&output.stdout).expect("Writing to the file...");
+            file.write_all(&output.stdout)
+                .expect("Writing to the file...");
 
             // println!(
             //     "Output: {}",
             //     String::from_utf8(output.stdout).expect("Error converting output to string")
             // );
-            
+
             processed_filename = processed_filename.replace(".png", ".hexa");
             // Then convert from hexadecimal to binary
             // This is the command we will run: xxd -r -p <filename> <filename>
