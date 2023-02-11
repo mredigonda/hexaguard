@@ -10,6 +10,7 @@ enum Mode {
 
 fn main() {
     let options = vec!["Encrypt", "Decrypt"];
+    let yes_no_options = vec!["Yes", "No"];
 
     let ans = Select::new("What?", options)
         .prompt()
@@ -69,8 +70,16 @@ fn main() {
         // Write to file, overwriting the existing file
         hexa_file.create_with_bytes(&concatenated_bytes);
         let hex_file = hexa_file.hexa_to_hex();
-        let png_file = hex_file.hex_to_qr_png();
-        png_file.qr_png_to_pdf();
+
+        // Ask if the user wants the qr code
+        let ans = Select::new("QR code?", yes_no_options)
+            .prompt()
+            .expect("No option selected.");
+
+        if ans == "Yes" {
+            /*let png_file = */hex_file.hex_to_qr_png();
+            // png_file.qr_png_to_pdf(); // to be added later...
+        }
 
         encrypted_file.delete();
         hex_file.delete();

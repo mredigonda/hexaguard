@@ -94,19 +94,19 @@ impl File {
         }
     }
 
-    pub fn qr_png_to_pdf(&self) -> File {
-        if self.is_png() {
-            let pdf_filename = self.get_filename_with_extension("pdf");
-            Command::new("convert")
-                .arg(&self.filename)
-                .arg(&pdf_filename)
-                .output()
-                .expect("convert failed to start");
-            File::new(&pdf_filename)
-        } else {
-            panic!("File must be a png");
-        }
-    }
+    // pub fn qr_png_to_pdf(&self) -> File {
+    //     if self.is_png() {
+    //         let pdf_filename = self.get_filename_with_extension("pdf");
+    //         Command::new("convert")
+    //             .arg(&self.filename)
+    //             .arg(&pdf_filename)
+    //             .output()
+    //             .expect("convert failed to start");
+    //         File::new(&pdf_filename)
+    //     } else {
+    //         panic!("File must be a png");
+    //     }
+    // }
 
     pub fn delete(&self) {
         std::fs::remove_file(&self.filename).expect("Deleting the file...");
