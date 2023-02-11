@@ -1,5 +1,6 @@
 use std::fs::File as FSFile;
 use std::io::Write;
+use std::io::Read;
 use std::process::Command;
 
 #[derive(Clone)]
@@ -76,14 +77,78 @@ impl File {
         std::path::Path::new(&self.filename).exists()
     }
 
-    pub fn get_filename_with_extension(&self, new_extension: &str) -> String {
-        // Remove characters from the end until we find a ".", then add ".hex"
+    pub fn get_filename_without_extension(&self) -> String {
+        if !self.filename.contains(".") {
+            return self.filename.clone();
+        }
+        // Remove characters from the end until we find a "."
         let mut new_filename = self.filename.clone();
         while !new_filename.ends_with(".") {
             new_filename.pop();
         }
+        new_filename.pop(); // Remove the "." as well
+        new_filename
+    }
+
+    // Example: "test.png" -> "test.hex"
+    // Input: "test.png", "hex"
+    pub fn get_filename_with_extension(&self, new_extension: &str) -> String {
+        let mut new_filename = self.filename.clone();
+        if new_filename.contains(".") {
+            // Remove characters from the end until we find a ".", then add ".hex"
+            while !new_filename.ends_with(".") {
+                new_filename.pop();
+            }
+        } else {
+            new_filename.push('.');
+        }
         new_filename.push_str(new_extension);
         new_filename
+    }
+
+    pub fn get_bytes(&self) -> Vec<u8> {
+        let mut buf: Vec<u8> = Vec::new();
+        if self.exists() {
+            FSFile::open(&self.filename)
+                .expect("Opening the result file...")
+                .read_to_end(&mut buf)
+                .expect("Reading the result file...");
+        }
+        buf
+    }
+
+    pub fn encrypt(&self, passphrase: &String) -> File {
+        // Run the following command: gpg --batch --passphrase "<passphrase>" -c <filename>
+        let mut child = Command::new("gpg")
+            .arg("--batch")
+            .arg("--passphrase")
+            .arg(passphrase)
+            .arg("-c")
+            .arg(&self.filename)
+            .spawn()
+            .expect("Encrypting the file...");
+        println!("(1) Ran encryption command");
+        child.wait().expect("Encrypting the file...");
+        println!("(2) Wait finished");
+        let encrypted_filename = self.get_filename_with_extension("gpg");
+        println!("(3) Encrypted filename: {}", encrypted_filename);
+        File::new(&encrypted_filename)
+        // If failed, the file will not exist
+    }
+
+    pub fn decrypt(&self, passphrase: &String) -> File {
+        // Run the following command: gpg --passphrase "<passphrase>" <filename>
+        let mut child = Command::new("gpg")
+            .arg("--batch")
+            .arg("--passphrase")
+            .arg(passphrase)
+            .arg(&self.filename)
+            .spawn()
+            .expect("Decrypting the file...");
+        child.wait().expect("Decrypting the file...");
+        let decrypted_filename = self.get_filename_without_extension();
+        File::new(&decrypted_filename)
+        // If failed, the file will not exist
     }
 
     // pub fn convert_qr_png_to_binary_hexa(&self) -> Vec<u8> {

@@ -56,21 +56,21 @@ fn main() {
     ];
     let separator_bytes_size = separator_bytes.len();
 
-    let filename = file.filename.clone();
+    // let filename = file.filename.clone();
 
     if matches!(mode, Mode::Encrypt) {
-        encrypt(&filename, &passphrase);
+        let encrypted_file = file.encrypt(&passphrase);
 
         let hexa_filename = Text::new("Where?").prompt().expect("No result filename.");
-        // Check if hexa_filename ends in ".hexa"
-        if !hexa_filename.ends_with(".hexa") {
-            println!("Result filename must end in .hexa");
+        let hexa_file = file::File::new(&hexa_filename);
+
+        if !hexa_file.is_hexa() {
+            println!("Result filename must end in .hexa");  
             return;
         }
 
         let mut existing_bytes = get_file_bytes(&hexa_filename);
-        let encrypted_filename = filename + ".gpg";
-        let mut new_bytes = get_file_bytes(&encrypted_filename);
+        let mut new_bytes = get_file_bytes(&encrypted_file.filename);
         let mut concatenated_bytes = Vec::new();
         concatenated_bytes.append(&mut existing_bytes);
         concatenated_bytes.append(&mut new_bytes);
@@ -167,14 +167,15 @@ fn main() {
         // result_file.write_all(&result_file_bytes).expect("Writing to the result file...");
 
         // After the process, delete the encrypted file
-        std::fs::remove_file(encrypted_filename).expect("Deleting the encrypted file...");
+        encrypted_file.delete();
+        // std::fs::remove_file(encrypted_filename).expect("Deleting the encrypted file...");
         // And also the .hex file
         std::fs::remove_file(hex_filename).expect("Deleting the .hex file...");
     } else {
         // Decrypt
-        println!("File to decrypt: {}", filename);
+        // If we are decrypting, we are sure that the file is hexa
 
-        let hexa_bytes = get_file_bytes(&filename);
+        let hexa_bytes = file.get_bytes();
 
         // Save all indexes where we have separator bytes
         // Print hexa bytes, in hex:
@@ -199,7 +200,7 @@ fn main() {
             }
         }
         // Print indexes
-        println!("Indexes: {:?}", indexes);
+        println!("\nIndexes: {:?}", indexes);
         // Then get all the bytes between the indexes
         let mut split_bytes: Vec<Vec<u8>> = Vec::new();
         for i in 0..indexes.len() {
@@ -224,12 +225,14 @@ fn main() {
         }
         // Decrypt each file
         for i in 0..split_bytes.len() {
-            if decrypt(&format!("{}.gpg", i), &passphrase) {
-                // If decryption worked, write the decrypted file to the result file
-                let decrypted_bytes = get_file_bytes(&format!("{}", i));
-                let decrypted_filename = filename.replace(".hexa", "");
+            let new_filename = file.get_filename_without_extension();
+            let file_to_decrypt = file::File::new(&format!("{}.gpg", i));
+            let decrypted_file = file_to_decrypt.decrypt(&passphrase);
+            if decrypted_file.exists() {
+                println!("⭐️ File {} decrypted! ⭐️", decrypted_file.filename);
+                let decrypted_bytes = decrypted_file.get_bytes();
                 let mut result_file =
-                    File::create(&decrypted_filename).expect("Creating the result file...");
+                    File::create(new_filename).expect("Creating the result file...");
                 result_file
                     .write_all(&decrypted_bytes)
                     .expect("Writing to the result file...");
@@ -251,33 +254,6 @@ fn main() {
     println!("You're welcome");
 }
 
-fn encrypt(filename: &String, passphrase: &String) -> bool {
-    // Run the following command: gpg --batch --passphrase "<passphrase>" -c <filename>
-    let mut child = Command::new("gpg")
-        .arg("--batch")
-        .arg("--passphrase")
-        .arg(passphrase)
-        .arg("-c")
-        .arg(filename)
-        .spawn()
-        .expect("Encrypting the file...");
-    let exit_status = child.wait().expect("Encrypting the file...");
-    return exit_status.success();
-}
-
-fn decrypt(filename: &String, passphrase: &String) -> bool {
-    // Run the following command: gpg --passphrase "<passphrase>" <filename>
-    let mut child = Command::new("gpg")
-        .arg("--batch")
-        .arg("--passphrase")
-        .arg(passphrase)
-        .arg(filename)
-        .spawn()
-        .expect("Decrypting the file...");
-    let exit_status = child.wait().expect("Decrypting the file...");
-    return exit_status.success();
-}
-
 fn get_file_bytes(filename: &String) -> Vec<u8> {
     let mut buf: Vec<u8> = Vec::new();
     if Path::new(&filename).exists() {
@@ -290,7 +266,6 @@ fn get_file_bytes(filename: &String) -> Vec<u8> {
     buf
 }
 
-// Write the same exact line as above but with lifetimes:
 fn get_processed_file(file: &file::File, mode: &Mode) -> file::File {
     if matches!(mode, Mode::Decrypt) {
         if file.is_png() {
