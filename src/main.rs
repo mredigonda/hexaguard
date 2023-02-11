@@ -1,7 +1,6 @@
 use inquire::Select;
 use inquire::Text;
 use std::fs::File;
-use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
@@ -69,8 +68,8 @@ fn main() {
             return;
         }
 
-        let mut existing_bytes = get_file_bytes(&hexa_filename);
-        let mut new_bytes = get_file_bytes(&encrypted_file.filename);
+        let mut existing_bytes = hexa_file.get_bytes();
+        let mut new_bytes = encrypted_file.get_bytes();
         let mut concatenated_bytes = Vec::new();
         concatenated_bytes.append(&mut existing_bytes);
         concatenated_bytes.append(&mut new_bytes);
@@ -252,18 +251,6 @@ fn main() {
     // Done
 
     println!("You're welcome");
-}
-
-fn get_file_bytes(filename: &String) -> Vec<u8> {
-    let mut buf: Vec<u8> = Vec::new();
-    if Path::new(&filename).exists() {
-        let bytes_read = File::open(&filename)
-            .expect("Opening the result file...")
-            .read_to_end(&mut buf)
-            .expect("Reading the result file...");
-        println!("Bytes read from result filename: {}", bytes_read);
-    }
-    buf
 }
 
 fn get_processed_file(file: &file::File, mode: &Mode) -> file::File {
