@@ -1,5 +1,7 @@
 <div align="center">
+
 ![hexaguard_logo](https://user-images.githubusercontent.com/124709666/218282007-9eef7a92-dff2-44ea-afeb-9a67a3b3f2c3.jpg)
+
 </div>
 
 # HexaGuard
