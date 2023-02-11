@@ -26,23 +26,15 @@ fn main() {
     };
 
     let base_filename = Text::new("What filename?").prompt().expect("No filename.");
+    let raw_file = file::File::new(&base_filename);
+    let file = get_processed_file(&raw_file, &mode);
 
-    let file = file::File::new(&base_filename);
-    if file.filename.ends_with(".png") {
-        let hex_file = file.qr_png_to_hex();
-        hex_file.hex_to_hexa();
-        hex_file.delete();
-        println!("Converted to hex");
-        return;
-    }
+    println!("Filename: {}", file.filename);
 
-    let filename = get_processed_filename(&base_filename, &mode);
+    // If we are decrypting, we are sure that the file is hexa
+    assert!(!matches!(&mode, Mode::Decrypt) || file.is_hexa());
 
-    println!("Filename: {}", filename);
-
-    assert!(!matches!(&mode, Mode::Decrypt) || filename.ends_with(".hexa"));
-
-    if !Path::new(&filename).exists() {
+    if !file.exists() {
         println!("No file.");
         return;
     }
@@ -63,6 +55,8 @@ fn main() {
         0x35,
     ];
     let separator_bytes_size = separator_bytes.len();
+
+    let filename = file.filename.clone();
 
     if matches!(mode, Mode::Encrypt) {
         encrypt(&filename, &passphrase);
@@ -296,54 +290,15 @@ fn get_file_bytes(filename: &String) -> Vec<u8> {
     buf
 }
 
-fn get_processed_filename(filename: &String, mode: &Mode) -> String {
-    let mut processed_filename = filename.clone();
+// Write the same exact line as above but with lifetimes:
+fn get_processed_file(file: &file::File, mode: &Mode) -> file::File {
     if matches!(mode, Mode::Decrypt) {
-        if processed_filename.contains(".png") {
-            // Then it's a QR code. We need to convert it to a .hexa file
-            // First, to hexadecimal
-            let hex_filename = processed_filename.replace(".png", ".hex");
-
-            // This is the command we will run: zbarimg --raw -q <filename> > <filename>
-            let output = Command::new("zbarimg")
-                .arg("--raw")
-                .arg("-q")
-                .arg(&filename)
-                // We pipe the output to a file, to write the file
-                // Like if we were doing "> <filename>"
-                .stdout(std::process::Stdio::piped())
-                .arg(&hex_filename)
-                .output()
-                .expect("zbarimg failed to start");
-
-            // Write the stdout of the above to a file:
-            let mut file = File::create(&hex_filename).expect("Creating the file...");
-            file.write_all(&output.stdout)
-                .expect("Writing to the file...");
-
-            // println!(
-            //     "Output: {}",
-            //     String::from_utf8(output.stdout).expect("Error converting output to string")
-            // );
-
-            processed_filename = processed_filename.replace(".png", ".hexa");
-            // Then convert from hexadecimal to binary
-            // This is the command we will run: xxd -r -p <filename> <filename>
-            Command::new("xxd")
-                .arg("-r")
-                .arg("-p")
-                .arg(&hex_filename)
-                .stdout(std::process::Stdio::piped())
-                .arg(&processed_filename)
-                .output()
-                .expect("xxd failed to start");
-            println!(
-                "QR code converted to .hexa file called {}",
-                processed_filename
-            );
-        } else if !processed_filename.contains(".hexa") {
-            panic!("The file must be a .png or a .hexa file")
+        if file.is_png() {
+            let hex_file = file.qr_png_to_hex();
+            let hexa_file = hex_file.hex_to_hexa();
+            hex_file.delete();  
+            return hexa_file;
         }
     }
-    processed_filename
+    file.clone()
 }
