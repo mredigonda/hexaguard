@@ -1,9 +1,6 @@
 use inquire::Select;
 use inquire::Text;
-// use std::fs::File;
-// use std::io::Write;
 use std::path::Path;
-use std::process::Command;
 mod file;
 
 enum Mode {
@@ -75,35 +72,27 @@ fn main() {
         // Write to file, overwriting the existing file
         hexa_file.create_with_bytes(&concatenated_bytes);
         
-        let hex_filename = hexa_filename.replace(".hexa", ".hex");
-
-        // Then, convert the file to hexadecimal with command xxd
-        Command::new("xxd")
-            .arg("-p")
-            .arg(&hexa_filename)
-            // And then save the output to a file
-            .arg(&hex_filename)
-            .output()
-            .expect("xxd failed to start");
+        // let hex_filename = hexa_filename.replace(".hexa", ".hex");
+        let hex_file = hexa_file.hexa_to_hex();
 
         // Now let's use this .hex file to get the QR code
         // First, we need to convert the .hex file into a .png file
-        let png_filename = hex_filename.replace(".hex", ".png");
-        Command::new("qrencode")
-            .arg("-o")
-            .arg(&png_filename)
-            .arg("-s")
-            .arg("10")
-            .arg("-l")
-            .arg("H")
-            .arg("-m")
-            .arg("1")
-            .arg("-d")
-            .arg("300")
-            .arg("-r")
-            .arg(&hex_filename)
-            .output()
-            .expect("qrencode failed to start");
+        let png_file = hex_file.hex_to_qr_png();
+        // Command::new("qrencode")
+        //     .arg("-o")
+        //     .arg(&png_filename)
+        //     .arg("-s")
+        //     .arg("10")
+        //     .arg("-l")
+        //     .arg("H")
+        //     .arg("-m")
+        //     .arg("1")
+        //     .arg("-d")
+        //     .arg("300")
+        //     .arg("-r")
+        //     .arg(&hex_filename)
+        //     .output()
+        //     .expect("qrencode failed to start");
         // Explanation of everything:
         // -o: output file
         // -s: size of the QR code
@@ -113,58 +102,10 @@ fn main() {
         // -r: read from file
 
         // Now let's create a PDF file with the QR code
-        let pdf_filename = hex_filename.replace(".hex", ".pdf");
-        // The PDF should fit in a A4 page, we print the QR code
-        // and then below can be whitespace
-        Command::new("convert")
-            .arg(&png_filename)
-            .arg(&pdf_filename)
-            .output()
-            .expect("convert failed to start");
-        // Explanation of everything:
-        // -size: size of the image
-        // -units: units of the size
-        // -density: DPI
-        // -background: background color
-        // -alpha: background color
-        // -gravity: where to put the image
-        // -extent: size of the image
-        // -append: append the image to the previous one
-        // The last argument is the input file
+        png_file.qr_png_to_pdf();
 
-        // Command::new("convert")
-        //     .arg(&png_filename)
-        //     .arg(&pdf_filename)
-        //     .output()
-        //     .expect("convert failed to start");
-
-        // Instead, we will write the bytes but as text, in hexadecimal
-        // let mut result_file = File::create(&hexa_filename).expect("Creating the result file...");
-        // for byte in &concatenated_bytes {
-        //     result_file.write_all(format!("{:02x}", byte).as_bytes()).expect("Writing to the result file...");
-        // }
-        // And then we read it and parse it back to binary
-        // let mut result_file = File::open(&hexa_filename).expect("Opening the result file...");
-        // let mut result_file_bytes = Vec::new();
-        // result_file.read_to_end(&mut result_file_bytes).expect("Reading the result file...");
-        // let mut result_file_hexa = String::new();
-        // for byte in &result_file_bytes {
-        //     result_file_hexa.push_str(&format!("{:02x}", byte));
-        // }
-        // let mut result_file_bytes = Vec::new();
-        // for i in 0..result_file_hexa.len() {
-        //     if i % 2 == 0 {
-        //         let byte = u8::from_str_radix(&result_file_hexa[i..i + 2], 16).expect("Parsing the byte...");
-        //         result_file_bytes.push(byte);
-        //     }
-        // }
-        // result_file.write_all(&result_file_bytes).expect("Writing to the result file...");
-
-        // After the process, delete the encrypted file
         encrypted_file.delete();
-        // std::fs::remove_file(encrypted_filename).expect("Deleting the encrypted file...");
-        // And also the .hex file
-        std::fs::remove_file(hex_filename).expect("Deleting the .hex file...");
+        hex_file.delete();
     } else {
         // Decrypt
         // If we are decrypting, we are sure that the file is hexa
@@ -213,9 +154,6 @@ fn main() {
 
         // Write each to its own file
         for i in 0..split_bytes.len() {
-            // let mut file = File::create(format!("{}.gpg", i)).expect("Creating the file...");
-            // file.write_all(&split_bytes[i])
-            //     .expect("Writing to the file...");
             let file = file::File::new(&format!("{}.gpg", i));
             file.create_with_bytes(&split_bytes[i]);
         }
@@ -227,11 +165,6 @@ fn main() {
             if decrypted_file.exists() {
                 println!("⭐️ File {} decrypted! ⭐️", decrypted_file.filename);
                 let decrypted_bytes = decrypted_file.get_bytes();
-                // let mut result_file =
-                //     File::create(new_filename).expect("Creating the result file...");
-                // result_file
-                //     .write_all(&decrypted_bytes)
-                //     .expect("Writing to the result file...");
                 let result_file = file::File::new(&new_filename);
                 result_file.create_with_bytes(&decrypted_bytes);
             }
@@ -245,11 +178,7 @@ fn main() {
         }
     }
 
-    // Save to file
-
-    // Done
-
-    println!("You're welcome");
+    println!("You're welcome 🥱");
 }
 
 fn get_processed_file(file: &file::File, mode: &Mode) -> file::File {

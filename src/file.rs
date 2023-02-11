@@ -53,6 +53,61 @@ impl File {
         }
     }
 
+    pub fn hexa_to_hex(&self) -> File {
+        if self.is_hexa() {
+            let hex_filename = self.get_filename_with_extension("hex");
+            // This is the command we will run: xxd -p <filename> <filename>
+            Command::new("xxd")
+                .arg("-p")
+                .arg(&self.filename)
+                .stdout(std::process::Stdio::piped())
+                .arg(&hex_filename)
+                .output()
+                .expect("xxd failed to start");
+            File::new(&hex_filename)
+        } else {
+            panic!("File must be a hexa");
+        }
+    }
+
+    pub fn hex_to_qr_png(&self) -> File {
+        if self.is_hex() {
+            let png_filename = self.get_filename_with_extension("png");
+            Command::new("qrencode")
+                .arg("-o")
+                .arg(&png_filename)
+                .arg("-s")
+                .arg("10")
+                .arg("-l")
+                .arg("H")
+                .arg("-m")
+                .arg("1")
+                .arg("-d")
+                .arg("300")
+                .arg("-r")
+                .arg(&self.filename)
+                .output()
+                .expect("qrencode failed to start");
+            File::new(&png_filename)
+        } else {
+            panic!("File must be a hex");
+        }
+    }
+
+    pub fn qr_png_to_pdf(&self) -> File {
+        if self.is_png() {
+            let pdf_filename = self.get_filename_with_extension("pdf");
+            Command::new("convert")
+                .arg(&self.filename)
+                .arg(&pdf_filename)
+                .output()
+                .expect("convert failed to start");
+            File::new(&pdf_filename)
+        } else {
+            panic!("File must be a png");
+        }
+    }
+
     pub fn delete(&self) {
         std::fs::remove_file(&self.filename).expect("Deleting the file...");
     }
