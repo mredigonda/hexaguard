@@ -1,6 +1,21 @@
+<div align="center">
+![hexaguard_logo](https://user-images.githubusercontent.com/124709666/218282007-9eef7a92-dff2-44ea-afeb-9a67a3b3f2c3.jpg)
+</div>
+
 # HexaGuard
 
 Multi-password multi-content in a single encrypted file.
+ 
+## Warning
+
+Do not use this project seriously. No guarantees are provided. It is just a toy proof of concept, and using it could result in serious data loss.
+
+## Demo
+
+## TODO
+
+- [ ] Use a real separator string of bytes that is **guaranteed** not to appear in the encrypted output of GPG
+- [ ] Generate a fancier PDF, in A4 format, that can go unnoticed
 
 ## Requirements
 

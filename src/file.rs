@@ -187,13 +187,13 @@ impl File {
             .arg(passphrase)
             .arg("-c")
             .arg(&self.filename)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .expect("Encrypting the file...");
-        println!("(1) Ran encryption command");
+
         child.wait().expect("Encrypting the file...");
-        println!("(2) Wait finished");
         let encrypted_filename = self.get_filename_with_extension("gpg");
-        println!("(3) Encrypted filename: {}", encrypted_filename);
         File::new(&encrypted_filename)
         // If failed, the file will not exist
     }
@@ -205,6 +205,8 @@ impl File {
             .arg("--passphrase")
             .arg(passphrase)
             .arg(&self.filename)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .spawn()
             .expect("Decrypting the file...");
         child.wait().expect("Decrypting the file...");

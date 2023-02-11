@@ -78,11 +78,6 @@ fn main() {
         let hexa_bytes = file.get_bytes();
         let split_bytes: Vec<Vec<u8>> = partition_by_separator(&hexa_bytes, &separator_bytes);
 
-        println!("Number of files: {}", split_bytes.len());
-        for i in 0..split_bytes.len() {
-            println!("Size of file {}: {}", i, split_bytes[i].len());
-        }
-
         // Write each to its own file
         for i in 0..split_bytes.len() {
             let file = file::File::new(&format!("{}.gpg", i));
@@ -94,7 +89,6 @@ fn main() {
             let file_to_decrypt = file::File::new(&format!("{}.gpg", i));
             let decrypted_file = file_to_decrypt.decrypt(&passphrase);
             if decrypted_file.exists() {
-                println!("⭐️ File {} decrypted! ⭐️", decrypted_file.filename);
                 let decrypted_bytes = decrypted_file.get_bytes();
                 let result_file = file::File::new(&new_filename);
                 result_file.create_with_bytes(&decrypted_bytes);
