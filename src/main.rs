@@ -1,7 +1,7 @@
 use inquire::Select;
 use inquire::Text;
-use std::fs::File;
-use std::io::Write;
+// use std::fs::File;
+// use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 mod file;
@@ -27,8 +27,6 @@ fn main() {
     let base_filename = Text::new("What filename?").prompt().expect("No filename.");
     let raw_file = file::File::new(&base_filename);
     let file = get_processed_file(&raw_file, &mode);
-
-    println!("Filename: {}", file.filename);
 
     // If we are decrypting, we are sure that the file is hexa
     assert!(!matches!(&mode, Mode::Decrypt) || file.is_hexa());
@@ -75,11 +73,8 @@ fn main() {
         concatenated_bytes.append(&mut new_bytes);
         concatenated_bytes.append(&mut separator_bytes);
         // Write to file, overwriting the existing file
-        File::create(&hexa_filename)
-            .expect("Creating the result file...")
-            .write_all(&concatenated_bytes)
-            .expect("Writing to the result file...");
-
+        hexa_file.create_with_bytes(&concatenated_bytes);
+        
         let hex_filename = hexa_filename.replace(".hexa", ".hex");
 
         // Then, convert the file to hexadecimal with command xxd
@@ -218,9 +213,11 @@ fn main() {
 
         // Write each to its own file
         for i in 0..split_bytes.len() {
-            let mut file = File::create(format!("{}.gpg", i)).expect("Creating the file...");
-            file.write_all(&split_bytes[i])
-                .expect("Writing to the file...");
+            // let mut file = File::create(format!("{}.gpg", i)).expect("Creating the file...");
+            // file.write_all(&split_bytes[i])
+            //     .expect("Writing to the file...");
+            let file = file::File::new(&format!("{}.gpg", i));
+            file.create_with_bytes(&split_bytes[i]);
         }
         // Decrypt each file
         for i in 0..split_bytes.len() {
@@ -230,11 +227,13 @@ fn main() {
             if decrypted_file.exists() {
                 println!("⭐️ File {} decrypted! ⭐️", decrypted_file.filename);
                 let decrypted_bytes = decrypted_file.get_bytes();
-                let mut result_file =
-                    File::create(new_filename).expect("Creating the result file...");
-                result_file
-                    .write_all(&decrypted_bytes)
-                    .expect("Writing to the result file...");
+                // let mut result_file =
+                //     File::create(new_filename).expect("Creating the result file...");
+                // result_file
+                //     .write_all(&decrypted_bytes)
+                //     .expect("Writing to the result file...");
+                let result_file = file::File::new(&new_filename);
+                result_file.create_with_bytes(&decrypted_bytes);
             }
         }
         // In the end, delete each file

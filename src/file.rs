@@ -57,6 +57,13 @@ impl File {
         std::fs::remove_file(&self.filename).expect("Deleting the file...");
     }
 
+    pub fn create_with_bytes(&self, bytes: &Vec<u8>) {
+        FSFile::create(&self.filename)
+            .expect("Creating the result file...")
+            .write_all(&bytes)
+            .expect("Writing to the result file...");
+    }
+
     pub fn is_png(&self) -> bool {
         self.has_extension(".png")
     }
