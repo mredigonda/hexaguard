@@ -126,20 +126,12 @@ fn get_processed_file(file: &file::File, mode: &Mode) -> file::File {
 
 fn find_indexes(bytes: &Vec<u8>, separator_bytes: &Vec<u8>) -> Vec<usize> {
     let mut indexes: Vec<usize> = Vec::new();
-    for i in 0..bytes.len() {
-        // Check if the sequence of separator bytes appears
-        if i + separator_bytes.len() - 1 < bytes.len() {
-            let mut is_separator = true;
-            for j in 0..separator_bytes.len() {
-                if bytes[i + j] != separator_bytes[j] {
-                    is_separator = false;
-                    break;
-                }
-            }
-            if is_separator {
-                indexes.push(i);
-            }
+    for i in 0..bytes.len() - separator_bytes.len() + 1 {
+        let chunk = &bytes[i..i + separator_bytes.len()];
+        if chunk == separator_bytes {
+            indexes.push(i);
         }
+
     }
     indexes
 }
