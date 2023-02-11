@@ -29,7 +29,9 @@ fn main() {
 
     let file = file::File::new(&base_filename);
     if file.filename.ends_with(".png") {
-        file.qr_png_to_hex();
+        let hex_file = file.qr_png_to_hex();
+        hex_file.hex_to_hexa();
+        hex_file.delete();
         println!("Converted to hex");
         return;
     }

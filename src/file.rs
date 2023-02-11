@@ -31,6 +31,23 @@ impl File {
         }
     }
 
+    pub fn hex_to_hexa(&self) {
+        if self.filename.ends_with(".hex") {
+            let hexa_filename = self.filename.replace(".hex", ".hexa");
+            // This is the command we will run: xxd -r -p <filename> <filename>
+            Command::new("xxd")
+                .arg("-r")
+                .arg("-p")
+                .arg(&self.filename)
+                .stdout(std::process::Stdio::piped())
+                .arg(&hexa_filename)
+                .output()
+                .expect("xxd failed to start");
+        } else {
+            panic!("File must be a hex");
+        }
+    }
+
     pub fn delete(&self) {
         std::fs::remove_file(&self.filename).expect("Deleting the file...");
     }
