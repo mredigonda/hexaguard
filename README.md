@@ -14,22 +14,24 @@ Multi-passphrase multi-content in a single encrypted file.
 
 ## ⚠️ Warning
 
-This tool is just a proof of concept, I made it only to satisfy my curiosity and learn more about the Rust programming language.
+This tool is just a proof of concept, almost a joke, I made it only to satisfy my curiosity and learn more about the Rust programming language.
 
-Using this could result in **serious data loss**. See "problems" on "how does it work" to understand more (I did this in two days heh).
+Using this will result in **serious data loss**. See "problems" on "how does it work" to understand more (I did this in two days heh).
+
+If you are really worried about protecting crypto assets, nmemonics in your hardware wallet are a superset of this.
 
 ## 🌱 Demo
 
-```c++
-// TODO: add video
-```
+https://user-images.githubusercontent.com/124709666/218742345-1732334b-cf25-4f68-814d-681558aca72e.mp4c
 
 ## Requirements
 
 - GPG (to actually encrypt/decrypt)
 - xxd (to transform to hexadecimal)
-- qrencode (to generate qr)
-- zbar (to decode qr)
+
+Optionals: 
+- qrencode (to generate qr) (`apt install qrencode`)
+- zbar (to decode qr) (`apt install zbar-tools`)
 - convert (to get PDF from qr)
 
 ## 🔧 How does it work?
@@ -42,5 +44,9 @@ When decrypting, the program parses the binary to partition it by this separator
 
 ### Problems:
 
+This list is a vastly incomplete list of problems:
+
 1. The separator string could appear as part of the output of the encryption algorithm, this would effectively break the program.
-2. There's no support for using the same passphrase for multiple files, one would get "lost"
+2. There's no support for using the same passphrase for multiple files, one would get "lost".
+3. Encrypting with this program is only lost-access-to-the-code away from forever losing whatever was encrypted.
+4. To the eyes of someone who knows, it would be trivial that there are actually two encrypted files stored next to each other.
